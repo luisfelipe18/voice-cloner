@@ -1,0 +1,3 @@
+# audiotools pins an obsolete protobuf version; its audio/quantizer code does
+# not use protobuf. ONNX requires a newer version.
+protobuf==4.25.8

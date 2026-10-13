@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "your-voice-your-song-api"
+version = "0.3.0"
+description = "Bilingual capture, word review and personal RVC singing conversion"
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements-vc.txt", "requirements-rvc.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.uv]
+override-dependencies = ["protobuf==4.25.8"]

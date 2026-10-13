@@ -1,0 +1,131 @@
+diff --git a/rvc/train/train.py b/rvc/train/train.py
+index 8969ac75..83d45925 100644
+--- a/rvc/train/train.py
++++ b/rvc/train/train.py
+@@ -64,6 +64,7 @@ cache_data_in_gpu = _strtobool(sys.argv[11])
+ cleanup = _strtobool(sys.argv[12])
+ vocoder = sys.argv[13]
+ checkpointing = _strtobool(sys.argv[14])
++fine_tuning = len(sys.argv) > 15 and sys.argv[15] == "fine-tune"
+ # experimental settings
+ randomized = True
+ d_lr_coeff = 1.0
+@@ -452,63 +453,54 @@ def run(
+ 
+     # Load checkpoint if available
+     scaler_dict = {}
+-    try:
+-        print("Starting training...")
+-        _, _, _, epoch_str, scaler_dict = load_checkpoint(
+-            latest_checkpoint_path(experiment_dir, "D_*.pth"), net_d, optim_d
+-        )
+-        _, _, _, epoch_str, _ = load_checkpoint(
+-            latest_checkpoint_path(experiment_dir, "G_*.pth"), net_g, optim_g
+-        )
+-        epoch_str += 1
+-        global_step = (epoch_str - 1) * len(train_loader)
+-
+-    except Exception as e:
++    if fine_tuning:
++        from rvc.train.finetuning import load_fine_tune_weights
++        load_fine_tune_weights(net_g, net_d, pretrainG, pretrainD)
+         epoch_str = 1
+         global_step = 0
+-
+-        if pretrainG not in ("", "None"):
+-            if rank == 0:
+-                print(f"Loaded pretrained (G) '{pretrainG}'")
+-            try:
+-                ckpt = torch.load(pretrainG, map_location="cpu", weights_only=True)[
+-                    "model"
+-                ]
+-                print(
+-                    f"Overriding the pretrain speaker embedding size to {spk_dim} speakers."
+-                )
+-                if hasattr(net_g, "module"):
+-                    ckpt["emb_g.weight"] = net_g.module.emb_g.weight.detach().clone()
+-                    net_g.module.load_state_dict(ckpt)
+-                else:
+-                    ckpt["emb_g.weight"] = net_g.emb_g.weight.detach().clone()
+-                    net_g.load_state_dict(ckpt)
+-                del ckpt
+-            except Exception as e:
+-                print(
+-                    "The parameters of the pretrain model such as the sample rate or architecture do not match the selected model."
+-                )
+-                print(e)
+-                sys.exit(1)
+-
+-        if pretrainD not in ("", "None"):
+-            if rank == 0:
+-                print(f"Loaded pretrained (D) '{pretrainD}'")
+-            try:
+-                ckpt = torch.load(pretrainD, map_location="cpu", weights_only=True)[
+-                    "model"
+-                ]
+-                if hasattr(net_d, "module"):
+-                    net_d.module.load_state_dict(ckpt)
+-                else:
+-                    net_d.load_state_dict(ckpt)
+-                del ckpt
+-            except Exception as e:
+-                print(
+-                    "The parameters of the pretrain model such as the sample rate or architecture do not match the selected model."
+-                )
+-                print(e)
+-                sys.exit(1)
++    else:
++        try:
++            print("Starting training...")
++            _, _, _, epoch_str, scaler_dict = load_checkpoint(
++                latest_checkpoint_path(experiment_dir, "D_*.pth"), net_d, optim_d
++            )
++            _, _, _, epoch_str, _ = load_checkpoint(
++                latest_checkpoint_path(experiment_dir, "G_*.pth"), net_g, optim_g
++            )
++            epoch_str += 1
++            global_step = (epoch_str - 1) * len(train_loader)
++
++        except Exception as e:
++            epoch_str = 1
++            global_step = 0
++
++            if pretrainG not in ("", "None"):
++                if rank == 0:
++                    print(f"Loaded pretrained (G) '{pretrainG}'")
++                try:
++                    ckpt = torch.load(pretrainG, map_location="cpu", weights_only=True)["model"]
++                    print(f"Overriding the pretrain speaker embedding size to {spk_dim} speakers.")
++                    target = net_g.module if hasattr(net_g, "module") else net_g
++                    ckpt["emb_g.weight"] = target.emb_g.weight.detach().clone()
++                    target.load_state_dict(ckpt)
++                    del ckpt
++                except Exception as e:
++                    print("The parameters of the pretrain model such as the sample rate or architecture do not match the selected model.")
++                    print(e)
++                    sys.exit(1)
++
++            if pretrainD not in ("", "None"):
++                if rank == 0:
++                    print(f"Loaded pretrained (D) '{pretrainD}'")
++                try:
++                    ckpt = torch.load(pretrainD, map_location="cpu", weights_only=True)["model"]
++                    target = net_d.module if hasattr(net_d, "module") else net_d
++                    target.load_state_dict(ckpt)
++                    del ckpt
++                except Exception as e:
++                    print("The parameters of the pretrain model such as the sample rate or architecture do not match the selected model.")
++                    print(e)
++                    sys.exit(1)
+ 
+     # Initialize schedulers
+     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(
+@@ -906,7 +898,7 @@ def train_and_evaluate(
+         print(record)
+ 
+         # Save weights every N epochs
+-        if epoch % save_every_epoch == 0:
++        if epoch % save_every_epoch == 0 or epoch >= custom_total_epoch:
+             checkpoint_suffix = f"{2333333 if save_only_latest else global_step}.pth"
+             save_checkpoint(
+                 net_g,

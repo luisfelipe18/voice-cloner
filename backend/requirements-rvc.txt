@@ -1,0 +1,11 @@
+faiss-cpu==1.10.0
+noisereduce==3.0.3
+pedalboard==0.9.17
+wget==3.2
+torchcrepe==0.0.23
+torchfcpe==0.0.4
+stftpitchshift==2.0
+swift-f0>=0.1
+click==8.1.8
+psutil>=6
+beautifulsoup4>=4.12

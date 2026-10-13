@@ -1,0 +1,20 @@
+services:
+  api:
+    build: ./backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./backend/storage:/workspace/backend/storage
+      - ./backend/models:/workspace/backend/models
+      - ./backend/Applio/rvc/models:/workspace/backend/Applio/rvc/models
+      - ./backend/Applio/logs:/workspace/backend/Applio/logs
+      - ./songs-original:/workspace/songs-original:ro
+      - ./songs-voice-replaced:/workspace/songs-voice-replaced
+  frontend:
+    build: ./frontend
+    environment:
+      BACKEND_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
